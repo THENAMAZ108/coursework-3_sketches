@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Создание заявки на покупку облигаций</title>
+    <style>
+        .disabled { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Создание заявки на покупку облигаций</h1>
+
+    <div>
+        <label for="bondSearch">Поиск облигаций:</label>
+        <input type="text" id="bondSearch" onkeyup="filterBonds()">
+        <select id="bondList" size="5" ondblclick="selectBond()">
+            <!-- Список облигаций будет заполнен динамически -->
+        </select>
+    </div>
+
+    <form id="orderForm" method="POST" action="/submit_order" onsubmit="handleSubmit(event)">
+        <label for="orderType">Тип заявки:</label>
+        <select id="orderType" name="orderType" onchange="handleOrderTypeChange()">
+            <option value="market" selected>Рыночная</option>
+            <option value="limit">Лимитная</option>
+            <option value="takeProfit">Отложенная тейк-профит</option>
+            <option value="stopLoss">Отложенная стоп-лосс</option>
+            <option value="trailingStop">Отложенная трейлинг-стоп</option>
+        </select>
+
+        <div id="lotQuantity">
+            <label for="lotCount">Количество лотов:</label>
+            <input type="number" id="lotCount" name="lotCount" disabled>
+        </div>
+
+        <div id="executionPrice">
+            <label for="executionPrice">Цена исполнения:</label>
+            <input type="number" id="executionPriceInput" name="executionPrice" disabled>
+        </div>
+
+        <div id="activationPrice">
+            <label for="activationPrice">Цена активации:</label>
+            <input type="number" id="activationPriceInput" name="activationPrice" disabled>
+        </div>
+
+        <div id="executionType">
+            <label for="executionType">Исполнение:</label>
+            <select id="executionTypeSelect" name="executionType" onchange="handleExecutionTypeChange()" disabled>
+                <option value="market">Рыночное</option>
+                <option value="limit">Лимитное</option>
+            </select>
+        </div>
+
+        <div id="expiryDate">
+            <label for="expiryDate">Дата отмены:</label>
+            <input type="date" id="expiryDateInput" name="expiryDate" disabled>
+            <label for="expiryUnlimited">
+                <input type="checkbox" id="expiryUnlimited" name="expiryUnlimited" onchange="handleExpiryUnlimitedChange()" disabled>
+                Бессрочная
+            </label>
+        </div>
+
+        <div id="priceOffset">
+            <label for="priceOffset">Отступ от цены:</label>
+            <input type="number" id="priceOffsetInput" name="priceOffset" disabled>
+            <button type="button" id="priceOffsetToggle" onclick="toggleCurrency('priceOffsetToggle')" disabled>₽</button>
+        </div>
+
+        <div id="protectionSpread">
+            <label for="protectionSpread">Защитный спред:</label>
+            <input type="number" id="protectionSpreadInput" name="protectionSpread" disabled>
+            <button type="button" id="protectionSpreadToggle" onclick="toggleCurrency('protectionSpreadToggle')" disabled>₽</button>
+        </div>
+
+        <div id="trailingStopActivation">
+            <label for="trailingStopActivation">Активация:</label>
+            <select id="trailingStopActivationSelect" name="trailingStopActivation" onchange="handleTrailingStopActivationChange()" disabled>
+                <option value="immediate">Моментальная</option>
+                <option value="delayed">Отложенная</option>
+            </select>
+        </div>
+
+        <button type="submit" onclick="handleSubmit(event)">Отправить</button>
+    </form>
+
+    <script>
+        const bonds = ['ВТБ ОФЗ-2025', 'Т-Банк ОФЗ-2026', 'Сбер ОФЗ-2027'];
+
+function filterBonds() {
+    const input = document.getElementById('bondSearch').value.toLowerCase();
+    const bondList = document.getElementById('bondList');
+    bondList.innerHTML = '';
+
+    bonds.forEach(bond => {
+        if (bond.toLowerCase().includes(input)) {
+            const option = document.createElement('option');
+            option.value = bond;
+            option.textContent = bond;
+            bondList.appendChild(option);
+        }
+    });
+}
+
+function selectBond() {
+    const bondList = document.getElementById('bondList');
+    const selectedBond = bondList.options[bondList.selectedIndex].value;
+    document.getElementById('bondSearch').value = selectedBond;
+}
+
+function handleOrderTypeChange() {
+    const orderType = document.getElementById('orderType').value;
+    const fields = ['lotCount', 'executionPriceInput', 'activationPriceInput', 'executionTypeSelect', 'expiryDateInput', 'expiryUnlimited', 'priceOffsetInput', 'protectionSpreadInput', 'priceOffsetToggle', 'protectionSpreadToggle', 'trailingStopActivationSelect'];
+
+    fields.forEach(field => {
+        const element = document.getElementById(field);
+        element.disabled = true;
+        if (element.tagName.toLowerCase() === 'input') {
+            element.value = '';
+        }
+    });
+
+    switch (orderType) {
+        case 'market':
+            document.getElementById('lotCount').disabled = false;
+            break;
+        case 'limit':
+            document.getElementById('executionPriceInput').disabled = false;
+            document.getElementById('lotCount').disabled = false;
+            break;
+        case 'takeProfit':
+        case 'stopLoss':
+            document.getElementById('activationPriceInput').disabled = false;
+            document.getElementById('lotCount').disabled = false;
+            document.getElementById('executionTypeSelect').disabled = false;
+            document.getElementById('expiryDateInput').disabled = false;
+            document.getElementById('expiryUnlimited').disabled = false;
+            break;
+        case 'trailingStop':
+            document.getElementById('priceOffsetInput').disabled = false;
+            document.getElementById('priceOffsetToggle').disabled = false;
+            document.getElementById('activationPriceInput').disabled = false;
+            document.getElementById('lotCount').disabled = false;
+            document.getElementById('executionTypeSelect').disabled = false;
+            document.getElementById('protectionSpreadInput').disabled = false;
+            document.getElementById('protectionSpreadToggle').disabled = false;
+            document.getElementById('trailingStopActivationSelect').disabled = false;
+            break;
+    }
+}
+
+function handleExecutionTypeChange() {
+    const executionType = document.getElementById('executionTypeSelect').value;
+    const executionPriceField = document.getElementById('executionPriceInput');
+    const protectionSpreadField = document.getElementById('protectionSpreadInput');
+    const protectionSpreadToggle = document.getElementById('protectionSpreadToggle');
+
+    if (executionType === 'market') {
+        executionPriceField.disabled = true;
+        executionPriceField.value = '';
+        protectionSpreadField.disabled = true;
+        protectionSpreadField.value = '';
+        protectionSpreadToggle.disabled = true;
+    } else {
+        executionPriceField.disabled = false;
+        protectionSpreadField.disabled = false;
+        protectionSpreadToggle.disabled = false;
+    }
+}
+
+function handleExpiryUnlimitedChange() {
+    const expiryUnlimited = document.getElementById('expiryUnlimited').checked;
+    const expiryDateField = document.getElementById('expiryDateInput');
+
+    if (expiryUnlimited) {
+        expiryDateField.disabled = true;
+        expiryDateField.value = '';
+    } else {
+        expiryDateField.disabled = false;
+    }
+}
+
+function handleTrailingStopActivationChange() {
+    const activationType = document.getElementById('trailingStopActivationSelect').value;
+    const activationPriceField = document.getElementById('activationPriceInput');
+
+    if (activationType === 'immediate') {
+        activationPriceField.disabled = true;
+        activationPriceField.value = '';
+    } else {
+        activationPriceField.disabled = false;
+    }
+}
+
+function toggleCurrency(buttonId) {
+    const button = document.getElementById(buttonId);
+    if (button.textContent === '₽') {
+        button.textContent = '%';
+    } else {
+        button.textContent = '₽';
+    }
+}
+
+const orderTypeMap = {
+    market: 'market',
+    limit: 'limit',
+    takeProfit: 'take-profit',
+    stopLoss: 'stop-loss',
+    trailingStop: 'trailing-stop'
+};
+
+function handleSubmit(event) {
+    event.preventDefault();
+
+    // Получение данных из формы
+    const bondName = document.getElementById('bondSearch').value || null;
+    const orderType = orderTypeMap[document.getElementById('orderType').value];  // Используем маппинг
+    const lotCount = document.getElementById('lotCount').value || null;
+    const executionPrice = document.getElementById('executionPriceInput').value || null;
+    const activationPrice = document.getElementById('activationPriceInput').value || null;
+    const executionType = document.getElementById('executionTypeSelect').value || null;
+    const expiryUnlimited = document.getElementById('expiryUnlimited').checked;
+    const expiryDate = expiryUnlimited ? null : document.getElementById('expiryDateInput').value || null;
+    const priceOffset = document.getElementById('priceOffsetInput').value || null;
+    const priceOffsetType = document.getElementById('priceOffsetToggle').textContent === '₽' ? 'currency' : 'percentage';
+    const protectionSpread = document.getElementById('protectionSpreadInput').value || null;
+    const protectionSpreadType = document.getElementById('protectionSpreadToggle').textContent === '₽' ? 'currency' : 'percentage';
+    const trailingStopActivation = document.getElementById('trailingStopActivationSelect').value || null;
+    const createdAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    // Формирование данных для отправки
+    const orderData = {
+        bondName: bondName,
+        orderType: orderType,  // Используем преобразованное значение
+        lotCount: lotCount,
+        executionPrice: executionPrice,
+        activationPrice: activationPrice,
+        executionType: executionType,
+        expiryDate: expiryDate,
+        priceOffset: priceOffset,
+        priceOffsetType: priceOffsetType,
+        protectionSpread: protectionSpread,
+        protectionSpreadType: protectionSpreadType,
+        trailingStopActivation: trailingStopActivation,
+        createdAt: createdAt
+    };
+
+    // Отправка данных на сервер
+    fetch('/submit_order', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orderData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Success:', data);
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+    });
+}// Initialize the form with the default selection
+document.addEventListener('DOMContentLoaded', () => {
+    handleOrderTypeChange();
+    filterBonds();
+});
+
+    </script>
+</body>
+</html>
